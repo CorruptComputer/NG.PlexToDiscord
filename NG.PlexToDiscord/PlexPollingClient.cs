@@ -1,17 +1,12 @@
 ﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 using NG.PlexToDiscord.Exceptions;
 
 using Plex.Api.Factories;
 using Plex.Library.ApiModels.Accounts;
 using Plex.Library.ApiModels.Servers;
-using Plex.Library.Factories;
-using Plex.ServerApi;
-using Plex.ServerApi.Api;
-using Plex.ServerApi.Clients;
-using Plex.ServerApi.Clients.Interfaces;
+
+using Serilog;
 
 namespace NG.PlexToDiscord
 {
@@ -42,7 +37,7 @@ namespace NG.PlexToDiscord
 
             string authType = _configuration.GetValue<string>(Constants.ConfigurationKeys.AppSettingsJson.PLEX_AUTH_TYPE);
 
-            Console.WriteLine($"Logging into Plex, using: {authType} Auth");
+            Log.Information($"Logging into Plex, using: {authType} Auth");
             PlexAccount account = authType.ToLowerInvariant() switch
             {
                 "basic" => _plexFactory.GetPlexAccount(
@@ -52,46 +47,47 @@ namespace NG.PlexToDiscord
                 "token" => _plexFactory.GetPlexAccount(
                     _configuration.GetValue<string>(Constants.ConfigurationKeys.SecretsJson.TOKEN)
                 ),
-                _ => throw new InvalidOperationException($"Unknown value for '{Constants.ConfigurationKeys.AppSettingsJson.PLEX_AUTH_TYPE}' in configuration!")
+                _ => throw new UnrecoverableException($"Unknown value for '{Constants.ConfigurationKeys.AppSettingsJson.PLEX_AUTH_TYPE}' in configuration!")
             };
 
             int pollingRateConfigured = _configuration.GetValue<int>(Constants.ConfigurationKeys.AppSettingsJson.POLLING_RATE_IN_SECONDS);
             int pollingRateInMilliseconds = Convert.ToInt32(TimeSpan.FromSeconds(60).TotalMilliseconds);
             string serverNameToMonitor = _configuration.GetValue<string>(Constants.ConfigurationKeys.AppSettingsJson.SERVER_NAME_TO_MONITOR);
 
-            Console.WriteLine("Selecting server...");
+            Log.Information("Selecting server...");
             List<Server> servers = await account.Servers();
             Server monitoredServer = servers.Count switch
             {
-                > 1 => servers.First(s => s.FriendlyName == serverNameToMonitor),
-                1 => servers.First(),
-                _ => throw new InvalidOperationException("You have no servers on your Plex account!")
+                > 1 => servers.First(s => s.FriendlyName == serverNameToMonitor && s.Owned == 1),
+                1 => servers.First(s => s.Owned == 1),
+                _ => throw new UnrecoverableException("You have no servers on your Plex account!")
             };
 
             if (monitoredServer == null)
             {
-                throw new InvalidOperationException("Something went wrong, couldn't find your server. Check appsettings.json");
+                throw new UnrecoverableException("Something went wrong, couldn't find your server. Check appsettings.json");
             }
 
-            Console.WriteLine($"Server '{monitoredServer.FriendlyName}' selected.");
+            Log.Information($"Server '{monitoredServer.FriendlyName}' selected.");
 
             bool canStartCheck = true;
-            _timer = new(async (state) => 
+            _timer = new(async (state) =>
             {
                 if (canStartCheck)
                 {
                     canStartCheck = false;
-                    Console.WriteLine("Starting Refresh...");
-                    await monitoredServer.RefreshContent();
+                    Log.Information("Starting Refresh...");
                     await monitoredServer.RefreshSync();
 
+                    // TODO: stuff with the new items here
+
                     var recentlyAdded = await monitoredServer.HomeHubRecentlyAdded(0, 20);
-                    Console.WriteLine("Refresh complete.");
+                    Log.Information("Refresh complete.");
                     canStartCheck = true;
                 }
                 else
                 {
-                    Console.WriteLine("Tried to refresh before the previous one ended, skipping.");
+                    Log.Information("Tried to refresh before the previous one ended, skipping.");
                 }
 
             }, state: 0, dueTime: 0, pollingRateInMilliseconds);
