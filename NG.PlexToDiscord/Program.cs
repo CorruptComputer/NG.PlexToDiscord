@@ -79,6 +79,12 @@ public static class Program
                          .AddJsonFile("./Configs/secrets.json", optional: false, reloadOnChange: false);
         });
 
+        // Setup logging
+        builder.ConfigureLogging(logging =>
+        {
+            logging.AddSerilog(dispose: true);
+        });
+
         // Setup dependancy injection
         builder.ConfigureServices((hostingContext, services) =>
         {

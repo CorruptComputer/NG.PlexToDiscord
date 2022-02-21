@@ -1,5 +1,13 @@
 # Plex to Discord
 
+## Built using 
+- [Plex.Api](https://github.com/jensenkd/plex-api)
+- [Serilog](https://github.com/serilog/serilog)
+  - [Serilog.Extensions.Logging](https://github.com/serilog/serilog-extensions-logging)
+  - [Serilog.Sinks.Console](https://github.com/serilog/serilog-sinks-console)
+
+## Notes
+
 Poll Plex for new media 
 
 If found send a message to the Discord channel with a list
