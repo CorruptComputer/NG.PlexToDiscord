@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 using NG.PlexToDiscord.Exceptions;
+using NG.PlexToDiscord.Plex;
 
 using Plex.Api.Factories;
 using Plex.Library.Factories;
@@ -32,14 +33,13 @@ public static class Program
             IPlexFactory plexFactory = host.Services.GetService<IPlexFactory>()
                 ?? throw new UnrecoverableException($"{nameof(IPlexFactory)} resolves to null!");
 
-
-            PlexPollingClient plexPollingClient = new(configuration, plexFactory);
+            PlexPollingManager plexPollingManager = new(configuration, plexFactory);
             bool shouldTryAgain = false;
             do
             {
                 try
                 {
-                    await plexPollingClient.Start();
+                    await plexPollingManager.StartPolling().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -47,21 +47,20 @@ public static class Program
                     {
                         Log.Warning($"Recoverable error occoured: {ex.Message}");
                         Log.Warning("Resetting...");
-                        plexPollingClient.Reset();
+                        plexPollingManager.ResetPolling();
                         shouldTryAgain = true;
                     }
                     else
                     {
                         Log.Error($"Unrecoverable error occoured: {ex.Message}");
                         Log.Error("Exiting...");
-                        plexPollingClient.Reset();
                         shouldTryAgain = false;
-                        host.Dispose();
+                        await host.StopAsync();
                     }
                 }
             } while (shouldTryAgain);
 
-            Console.ReadLine();
+            await host.WaitForShutdownAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {

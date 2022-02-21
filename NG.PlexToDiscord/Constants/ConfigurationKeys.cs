@@ -1,6 +1,4 @@
-﻿namespace NG.PlexToDiscord;
-
-internal static class Constants
+﻿namespace NG.PlexToDiscord.Constants
 {
     internal static class ConfigurationKeys
     {
@@ -8,6 +6,8 @@ internal static class Constants
         internal static class AppSettingsJson
         {
             internal const string CLIENT_OPTIONS = "ClientOptions";
+
+            // Honestly I'm not sure this would ever be needed, might remove this at some point.
             internal static class ClientOptions
             {
                 internal const string PRODUCT = "Product";
